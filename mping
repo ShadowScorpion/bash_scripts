@@ -1,0 +1,77 @@
+#!/bin/bash
+
+function man {
+cat << EOF
+Usage: mping --input_hosts=[file] [OPTION]
+
+  --input_hosts=file 
+  	Location of file where stored list of servers/IPs
+  --output_file_up=file
+  	Location of file where script should send UP hosts
+  --output_file_down=file
+  	Location of file where script should send DOWN hosts
+EOF
+}
+
+if [[ $# -eq 0 ]] ; then
+	echo "No arguments!"
+	man
+	exit 1
+fi
+
+while [[ $# > 0 ]] ; do
+	case "$1" in
+		--input_hosts=*)
+			input_file=`echo $1 | sed 's/--input_hosts=//g'`
+			shift
+			;;
+		--output_file_up=*)
+			output_file_up=`echo $1 | sed 's/--output_file_up=//g'`
+			shift 
+			;;
+                --output_file_down=*)
+			output_file_down=`echo $1 | sed 's/--output_file_down=//g'`
+			shift
+			;;
+		*)
+			echo "Unknown argument : $1."
+			shift
+			;;
+	esac
+done
+
+results=()
+count=0
+
+if [[ -z $input_file ]]; then
+	echo "No input file with IPs list!"
+	man
+	exit 1
+fi
+
+if [[ -z $output_file_up ]]; then
+	echo "No output file for hosts with UP status is specified. Default : /tmp/hosts_up"
+	output_file_up='/tmp/hosts_up'
+fi
+
+if [[ -z $output_file_down ]]; then
+	echo "No output file for hosts with DOWN status was specified. Default : /tmp/hosts_down"
+	output_file_down='/tmp/hosts_down'
+fi
+
+function fping() {
+	results[$1]=`ping -v -c 1 $2 2>/dev/null`
+	if [[ ${results[$1]} = *"100% packet loss"* ]]; then
+		echo `date '+%Y-%m-%d %H:%M:%S'` DOWN : $2 >> "${output_file_down}"
+	else 
+		echo `date '+%Y-%m-%d %H:%M:%S'` UP : $2 >> "${output_file_up}"
+	fi
+}
+
+for host in `cat $input_file`; do 
+	fping $count $host & 
+	((count++))
+	wait ;
+done
+
+exit 0
